@@ -15,7 +15,11 @@ const getPokemon = async (req, res) => {
             weight: response.data.weight,
             types: response.data.types.map(t => t.type.name),
             sprite: response.data.sprites.front_default,
-            abilities: response.data.abilities.map(a => a.ability.name)
+            abilities: response.data.abilities.map(a => a.ability.name),
+            stats: response.data.stats.map(stat => ({
+                name: stat.stat.name,
+                base: stat.base_stat
+            }))
         };
 
         res.json(pokemonData);
@@ -28,8 +32,8 @@ const getPokemon = async (req, res) => {
 const getPokemonList = async (req, res) => {
     try {
         let { limit, offset } = req.query;
-        limit = limit ? parseInt(limit) : 10; // Número de Pokémon a mostrar (por defecto 10)
-        offset = offset ? parseInt(offset) : 0; // Desde qué Pokémon empezar
+        limit = limit ? parseInt(limit) : 10;
+        offset = offset ? parseInt(offset) : 0;
 
         const response = await axios.get(`${BASE_URL}?limit=${limit}&offset=${offset}`);
 
