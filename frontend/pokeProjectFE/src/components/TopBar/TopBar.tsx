@@ -1,4 +1,4 @@
-// src/components/TopBar/TopBar.txx
+// src/components/TopBar/TopBar.tsx
 import React from 'react';
 import {
   IonHeader,
@@ -7,10 +7,11 @@ import {
   IonButtons,
   IonButton,
   IonMenuToggle,
-  IonIcon
+  IonIcon,
+  IonRouterLink // Importa IonRouterLink
 } from '@ionic/react';
 import { menuOutline } from 'ionicons/icons';
-import './TopBar.css'; // Asegúrate de crear este archivo CSS
+import './TopBar.css';
 
 interface TopBarProps {
   title?: string;
@@ -33,17 +34,21 @@ const TopBar: React.FC<TopBarProps> = ({ title = 'PokeLab' }) => {
         </IonButtons>
 
         <div className="title-container">
-          <IonTitle className='pokemon-title'>
-            {title}
-          </IonTitle>
+          <IonRouterLink routerLink="/home" routerDirection="forward"> {/* Ruta al home */}
+            <IonTitle className='pokemon-title'>
+              {title}
+            </IonTitle>
+          </IonRouterLink>
         </div>
 
         <IonButtons slot="end">
-          <img 
-            src="/assets/pokemon.png" 
-            alt="Pokémon Logo"
-            className="pokemon-logo" 
-          />
+          <IonRouterLink routerLink="/home" routerDirection="forward"> {/* Ruta al home */}
+            <img 
+              src="/assets/pokemon.png" 
+              alt="Pokémon Logo"
+              className="pokemon-logo" 
+            />
+          </IonRouterLink>
         </IonButtons>
       </IonToolbar>
     </IonHeader>

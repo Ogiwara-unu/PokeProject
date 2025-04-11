@@ -29,3 +29,23 @@ ion-header{
     margin-right: 20px;
     margin: 10px;
   }
+  /* 📱 Responsive */
+@media (max-width: 768px) {
+  .menu-icon {
+    font-size: 28px;
+    margin: 5px;
+  }
+
+  .pokemon-title {
+    font-size: 1.6rem;
+  }
+
+  .pokemon-logo {
+    height: 35px;
+    margin: 5px 10px 5px 5px;
+  }
+
+  .title-container {
+    margin-top: 5px;
+  }
+}

@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3000/api/pokemon';
+const API_URL = 'https://pokeapi.co/api/v2'; // URL base de PokeAPI
 
-// Tipos de Pokémon unificados
+// Tipos de Pokémon
 interface PokemonStat {
   name: string;
   base: number;
@@ -25,7 +25,9 @@ interface PokemonDetails extends BasicPokemon {
 
 interface PokemonListResponse {
   count: number;
-  pokemon: BasicPokemon[];
+  next: string | null;
+  previous: string | null;
+  results: BasicPokemon[];
 }
 
 interface PokemonComparison {
@@ -36,170 +38,139 @@ interface PokemonComparison {
   };
 }
 
-// Implementación de caché (ahora usando PokemonDetails[])
-const searchCache = new Map<string, PokemonDetails[]>();
-let cachedPokemonList: BasicPokemon[] = [];
+// Función utilitaria para obtener el sprite
+export const getPokemonSprite = (id: number): string => {
+  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+};
 
-/**
- * Obtiene la lista completa de Pokémon (con caché)
- */
-const getFullPokemonList = async (): Promise<BasicPokemon[]> => {
-  if (cachedPokemonList.length > 0) return cachedPokemonList;
+// Normalizar nombre de Pokémon
+const normalizePokemonName = (name: string): string => {
+  return name.toLowerCase().trim();
+};
 
+// Función para crear datos de fallback
+const createFallbackPokemon = (identifier: string | number): PokemonDetails => {
+  const id = typeof identifier === 'number' ? identifier : parseInt(identifier, 10) || 0;
+  const name = typeof identifier === 'string' ? identifier : `pokemon-${identifier}`;
+  
+  return {
+    id,
+    name,
+    url: `${API_URL}/pokemon/${id}`,
+    sprite: getPokemonSprite(id),
+    height: 0,
+    weight: 0,
+    types: [],
+    abilities: [],
+    stats: []
+  };
+};
+
+// Obtener lista completa de Pokémon
+export const getFullPokemonList = async (): Promise<BasicPokemon[]> => {
   try {
-    const response = await axios.get(`${API_URL}?limit=1000&offset=0`);
-    cachedPokemonList = response.data.pokemon.map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      url: p.url || `${API_URL}/${p.name}`,
-      sprite: p.sprite || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`
-    }));
-    return cachedPokemonList;
+    const response = await axios.get(`${API_URL}/pokemon?limit=2000`);
+    const results = response.data.results;
+
+    return results.map((pokemon: any, index: number) => {
+      const id = index + 1;
+      return {
+        id,
+        name: pokemon.name,
+        url: pokemon.url,
+        sprite: getPokemonSprite(id)
+      };
+    });
   } catch (error) {
-    console.error('Error cargando lista completa de Pokémon:', error);
-    return [];
+    console.error('Error al obtener lista completa:', error);
+    throw error;
   }
 };
 
-/**
- * Búsqueda en tiempo real por nombre o número
- */
+// Obtener detalles de un Pokémon
+export const fetchPokemonDetails = async (identifier: string | number): Promise<PokemonDetails> => {
+  const key = typeof identifier === 'number' ? identifier.toString() : normalizePokemonName(identifier);
+
+  try {
+    const response = await axios.get(`${API_URL}/pokemon/${key}`);
+    const data = response.data;
+
+    return {
+      id: data.id,
+      name: data.name,
+      url: `${API_URL}/pokemon/${data.id}`,
+      sprite: data.sprites?.other?.['official-artwork']?.front_default || getPokemonSprite(data.id),
+      height: data.height / 10,
+      weight: data.weight / 10,
+      types: data.types.map((t: any) => t.type.name),
+      abilities: data.abilities.map((a: any) => a.ability.name),
+      stats: data.stats.map((s: any) => ({
+        name: s.stat.name,
+        base: s.base_stat
+      }))
+    };
+  } catch (error) {
+    console.error(`Error al obtener detalles de ${key}:`, error);
+    
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      return createFallbackPokemon(identifier);
+    }
+    
+    throw error;
+  }
+};
+
+// Buscar Pokémon
 export const searchPokemon = async (query: string): Promise<PokemonDetails[]> => {
   if (!query.trim()) return [];
 
-  const cacheKey = query.toLowerCase();
-  if (searchCache.has(cacheKey)) {
-    return searchCache.get(cacheKey)!;
-  }
+  const normalizedQuery = normalizePokemonName(query);
+  const isNumericSearch = !isNaN(Number(query));
 
   try {
     const allPokemon = await getFullPokemonList();
-    const isNumericSearch = !isNaN(Number(query));
-    const queryLower = query.toLowerCase();
-
     const basicResults = allPokemon.filter(pokemon => {
       if (isNumericSearch) {
         return pokemon.id.toString().includes(query);
       }
-      return pokemon.name.toLowerCase().includes(queryLower);
+      return pokemon.name.toLowerCase().includes(normalizedQuery);
     });
 
-    // Obtener detalles completos para cada resultado con manejo de errores
     const detailedResults = await Promise.all(
-      basicResults.map(pokemon => 
-        fetchPokemonDetails(pokemon.name).catch(error => {
-          console.error(`Error fetching details for ${pokemon.name}:`, error);
+      basicResults.map(async pokemon => {
+        try {
+          return await fetchPokemonDetails(pokemon.id);
+        } catch (error) {
+          console.error(`Error obteniendo detalles para ${pokemon.name}:`, error);
           return null;
-        })
-      )
+        }
+      })
     );
 
-    // Filtrar resultados nulos y ordenar
-    const validResults = detailedResults.filter(result => result !== null) as PokemonDetails[];
-    
-    validResults.sort((a, b) => {
-      const aIndex = a.name.toLowerCase().indexOf(queryLower);
-      const bIndex = b.name.toLowerCase().indexOf(queryLower);
-      return aIndex - bIndex || a.name.localeCompare(b.name);
-    });
-
-    searchCache.set(cacheKey, validResults);
-    return validResults;
-
+    return detailedResults.filter((result): result is PokemonDetails => result !== null);
   } catch (error) {
     console.error('Error en la búsqueda:', error);
     return [];
   }
 };
 
-/**
- * Obtiene lista paginada de Pokémon
- */
-export const fetchPokemonList = async (limit: number = 10, offset: number = 0): Promise<PokemonListResponse> => {
+// Obtener lista paginada de Pokémon
+export const fetchPokemonList = async (limit: number = 20, offset: number = 0): Promise<PokemonListResponse> => {
   try {
-    // 1. Obtener lista básica
-    const response = await axios.get(`${API_URL}?limit=${limit}&offset=${offset}`);
-    
-    // 2. Obtener detalles completos (incluyendo tipos) para cada Pokémon
-    const detailedPokemon = await Promise.all(
-      response.data.pokemon.map(async (p: any) => {
-        try {
-          const details = await fetchPokemonDetails(p.name);
-          return {
-            id: details.id,
-            name: details.name,
-            url: p.url || `${API_URL}/${p.name}`,
-            sprite: details.sprite,
-            types: details.types // Añadimos los tipos aquí
-          };
-        } catch (error) {
-          console.error(`Error fetching details for ${p.name}:`, error);
-          return {
-            id: p.id,
-            name: p.name,
-            url: p.url || `${API_URL}/${p.name}`,
-            sprite: p.sprite || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`,
-            types: [] // Tipo vacío como fallback
-          };
-        }
-      })
-    );
-
+    const response = await axios.get(`${API_URL}/pokemon?limit=${limit}&offset=${offset}`);
     return {
       count: response.data.count,
-      pokemon: detailedPokemon
+      next: response.data.next,
+      previous: response.data.previous,
+      results: response.data.results
     };
   } catch (error) {
-    console.error('Error obteniendo lista de Pokémon:', error);
+    console.error('Error al obtener lista paginada:', error);
     throw error;
   }
 };
 
-/**
- * Obtiene detalles completos de un Pokémon
- */
-export const fetchPokemonDetails = async (name: string): Promise<PokemonDetails> => {
-  try {
-    const response = await axios.get(`${API_URL}/${name.toLowerCase()}`);
-    const data = response.data;
-    
-    // Safely map stats with proper error handling
-    const stats: PokemonStat[] = [];
-    if (Array.isArray(data.stats)) {
-      data.stats.forEach((stat: any) => {
-        try {
-          if (stat && stat.stat && stat.base_stat !== undefined) {
-            stats.push({
-              name: stat.stat.name,
-              base: stat.base_stat
-            });
-          }
-        } catch (error) {
-          console.warn(`Error processing stat for ${name}:`, stat, error);
-        }
-      });
-    }
-
-    return {
-      id: data.id,
-      name: data.name,
-      url: `${API_URL}/${data.name}`,
-      height: data.height || 0,
-      weight: data.weight || 0,
-      types: Array.isArray(data.types) ? data.types : [],
-      abilities: Array.isArray(data.abilities) ? data.abilities : [],
-      sprite: data.sprite || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${data.id}.png`,
-      stats: stats
-    };
-  } catch (error) {
-    console.error(`Error obteniendo detalles de ${name}:`, error);
-    throw error;
-  }
-};
-
-/**
- * Compara dos Pokémon
- */
+// Comparar Pokémon
 export const comparePokemon = async (name1: string, name2: string): Promise<PokemonComparison> => {
   try {
     const [pokemon1, pokemon2] = await Promise.all([
@@ -207,10 +178,8 @@ export const comparePokemon = async (name1: string, name2: string): Promise<Poke
       fetchPokemonDetails(name2)
     ]);
 
-    // Crear objeto de diferencias dinámicamente
     const differences: {[key: string]: number} = {};
-    
-    // Comparar cada estadística
+
     pokemon1.stats.forEach((stat, index) => {
       if (pokemon2.stats[index]) {
         differences[stat.name] = stat.base - pokemon2.stats[index].base;

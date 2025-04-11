@@ -2,7 +2,7 @@ import {
   IonCard, IonCardContent, IonImg, IonBadge, IonNote, IonContent, 
   IonSearchbar, IonToolbar, IonSkeletonText, IonButton, IonIcon 
 } from '@ionic/react';
-import { fetchPokemonList, searchPokemon } from '../../services/PokemonService';
+import { fetchPokemonList, searchPokemon, fetchPokemonDetails, getPokemonSprite } from '../../services/PokemonService';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { star, starOutline } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
@@ -74,23 +74,46 @@ const PokemonList: React.FC<PokemonListProps> = ({
     setError('');
     try {
       const data = await fetchPokemonList(limit, newOffset);
-      const formattedList = data.pokemon.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        sprite: p.sprite || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`,
-        url: p.url || '',
-        types: p.types || [],
-        height: p.height,
-        weight: p.weight,
-        abilities: p.abilities || [],
-        stats: p.stats || []
-      }));
       
-      setPokemonList(formattedList);
-      setFilteredList(formattedList);
+      // Cargar detalles completos para cada Pokémon
+      const detailedPokemons = await Promise.all(
+        data.results.map(async (p: any) => {
+          const id = parseInt(p.url.split('/').filter(Boolean).pop());
+          try {
+            const details = await fetchPokemonDetails(id);
+            return {
+              id: details.id,
+              name: details.name,
+              sprite: details.sprite,
+              url: details.url,
+              types: details.types,
+              height: details.height,
+              weight: details.weight,
+              abilities: details.abilities,
+              stats: details.stats
+            };
+          } catch (error) {
+            console.error(`Error loading details for Pokémon ${id}:`, error);
+            return {
+              id,
+              name: p.name,
+              sprite: getPokemonSprite(id),
+              url: p.url,
+              types: [],
+              height: 0,
+              weight: 0,
+              abilities: [],
+              stats: []
+            };
+          }
+        })
+      );
+      
+      setPokemonList(detailedPokemons);
+      setFilteredList(detailedPokemons);
       
       if (onListLoaded) {
-        onListLoaded(formattedList);
+        onListLoaded(detailedPokemons);
       }
     } catch (err) {
       console.error("Error loading Pokémon:", err);
@@ -124,8 +147,8 @@ const PokemonList: React.FC<PokemonListProps> = ({
         const formattedResults = results.map((p: any) => ({
           id: p.id,
           name: p.name,
-          sprite: p.sprite || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`,
-          url: p.url || '',
+          sprite: p.sprite,
+          url: p.url,
           types: p.types || [],
           height: p.height,
           weight: p.weight,
@@ -216,56 +239,55 @@ const PokemonList: React.FC<PokemonListProps> = ({
         <>
           <div className="pokemon-grid-container">
             {filteredList.map((pokemon) => (
-           <IonCard 
-           key={pokemon.id}
-           className="pokemon-card"
-           button={false}
-         >
-           <div className="pokemon-card-header">
-             <div className="pokemon-number">
-               N° {pokemon.id.toString().padStart(4, '0')}
-             </div>
-             <IonButton 
-               fill="clear" 
-               className="favorite-button"
-               onClick={(e) => toggleFavorite(pokemon.id, e)}
-             >
-               <IonIcon 
-                 icon={favorites.includes(pokemon.id) ? star : starOutline} 
-                 color={favorites.includes(pokemon.id) ? 'warning' : 'medium'}
-               />
-             </IonButton>
-           </div>
-           
-           <div className="pokemon-card-content-wrapper" onClick={() => handlePokemonClick(pokemon)}>
-             <IonCardContent className="pokemon-card-content">
-             <div className="pokemon-image-container">
-  <div className="pokemon-image-frame">
-    <IonImg 
-      src={pokemon.sprite}
-      className="pokemon-sprite"
-      alt={`${pokemon.name} sprite`}
-    />
-  </div>
-</div>
-               <div className="pokemon-name-container">
-                 {pokemon.name.charAt(0).toUpperCase() + pokemon.name.slice(1)}
-               </div>
-               
-               {/* Mostrar todos los tipos del Pokémon */}
-               <div className="pokemon-types-container">
-                 {pokemon.types.map((type, index) => (
-                  <div 
-                  key={index}
-                  className={`pokemon-type-badge type-${type.toLowerCase()}`}
-                >
-                  {type.toUpperCase()}
+              <IonCard 
+                key={pokemon.id}
+                className="pokemon-card"
+                button={false}
+              >
+                <div className="pokemon-card-header">
+                  <div className="pokemon-number">
+                    N° {pokemon.id.toString().padStart(4, '0')}
+                  </div>
+                  <IonButton 
+                    fill="clear" 
+                    className="favorite-button"
+                    onClick={(e) => toggleFavorite(pokemon.id, e)}
+                  >
+                    <IonIcon 
+                      icon={favorites.includes(pokemon.id) ? star : starOutline} 
+                      color={favorites.includes(pokemon.id) ? 'warning' : 'medium'}
+                    />
+                  </IonButton>
                 </div>
-                 ))}
-               </div>
-             </IonCardContent>
-           </div>
-         </IonCard>
+                
+                <div className="pokemon-card-content-wrapper" onClick={() => handlePokemonClick(pokemon)}>
+                  <IonCardContent className="pokemon-card-content">
+                    <div className="pokemon-image-container">
+                      <div className="pokemon-image-frame">
+                        <IonImg 
+                          src={pokemon.sprite}
+                          className="pokemon-sprite"
+                          alt={`${pokemon.name} sprite`}
+                        />
+                      </div>
+                    </div>
+                    <div className="pokemon-name-container">
+                      {pokemon.name.charAt(0).toUpperCase() + pokemon.name.slice(1)}
+                    </div>
+                    
+                    <div className="pokemon-types-container">
+                      {pokemon.types.map((type, index) => (
+                        <div 
+                          key={index}
+                          className={`pokemon-type-badge type-${type.toLowerCase()}`}
+                        >
+                          {type.toUpperCase()}
+                        </div>
+                      ))}
+                    </div>
+                  </IonCardContent>
+                </div>
+              </IonCard>
             ))}
           </div>
 
