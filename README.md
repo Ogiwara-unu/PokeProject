@@ -1,20 +1,50 @@
-Pokédex SPA
-Description
-This project is a Single Page Application (SPA) developed using React for the frontend and Express.js for the backend, with PM2 for process management and deployment. The application consumes data from PokeAPI to display detailed Pokémon information and includes three main modules:
+<h1 align="center">
+  <img src="https://github.com/Ogiwara-unu/PokeProject/blob/main/frontend/pokeProjectFE/public/assets/pikachu.png?raw=true" alt="Pikachu" width="120"/>
+  <br/>
+  Pokédex SPA
+</h1>
 
-Pokémon List with dynamic search and filtering.
+## 📋 Descripción
 
-Pokémon Details view, showing stats and images.
+**Pokédex SPA** es una aplicación de una sola página (Single Page Application) desarrollada con **React** para el frontend y **Express.js** para el backend. Utiliza **PM2** para la gestión y despliegue de procesos. Esta aplicación consume datos desde [PokeAPI](https://pokeapi.co/) y permite visualizar información detallada sobre distintos Pokémon.
 
-Pokémon Comparator to compare two selected Pokémon.
+### 🧩 Módulos principales:
 
-Pokémon Favorite list.
+- 📜 **Lista de Pokémon**  
+  Búsqueda dinámica y filtrado por nombre o tipo.
 
-Technologies Used
-Frontend: React, Vite, CSS, indexedDB, Service Worker, Axios.
+- 📊 **Vista de detalles**  
+  Muestra estadísticas, imágenes y habilidades de cada Pokémon.
 
-Backend: Node.js with Express.js, Axios.
+- ⚔️ **Comparador de Pokémon**  
+  Compara estadísticas clave entre dos Pokémon seleccionados.
 
-Process Management: PM2.
+- ⭐ **Lista de favoritos**  
+  Guarda tus Pokémon preferidos en una lista personal.
 
-External API: PokeAPI (https://pokeapi.co/).
+---
+
+## 🛠️ Tecnologías utilizadas
+
+### 🔸 Frontend
+
+- **React**
+- **Vite**
+- **CSS**
+- **IndexedDB**
+- **Service Worker**
+- **Axios**
+
+### 🔹 Backend
+
+- **Node.js**
+- **Express.js**
+- **Axios**
+
+### ⚙️ Gestión de procesos
+
+- **PM2**
+
+### 🌐 API externa
+
+- [**PokeAPI**](https://pokeapi.co/)
