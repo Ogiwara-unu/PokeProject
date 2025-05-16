@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="https://github.com/Ogiwara-unu/PokeProject/blob/main/frontend/pokeProjectFE/public/assets/pikachu.png?raw=true" alt="Pikachu" width="120"/>
+  <img src="https://raw.githubusercontent.com/Ogiwara-unu/PokeProject/main/frontend/pokeProjectFE/public/assets/pikachu.png" alt="Pikachu" width="120"/>
   <br/>
   Pokédex SPA
 </h1>
