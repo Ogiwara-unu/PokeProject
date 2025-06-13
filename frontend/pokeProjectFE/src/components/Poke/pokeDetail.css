@@ -52,19 +52,19 @@ ion-item, ion-card {
 }
 
 .ability-item {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Espacio entre estrella y texto */
   font-size: 20px;
   margin: 10px 5px;
-  padding-left: 30px;
-  position: relative;
-  text-transform: capitalize;
   color: #2c3e50;
 }
 
 .ability-item::before {
   content: "⭐";
-  position: absolute;
-  left: 0;
-  margin-right: 10px;
+  display: inline-block;
+  width: 20px; /* Tamaño fijo para alinear bien */
+  text-align: center;
 }
 
 ion-badge {
