@@ -160,7 +160,7 @@ const PokeDetails: React.FC = () => {
 
   return (
     <>
-      {!isMobile && <Sidebar />}
+     <Sidebar />
 
       <IonPage id="main-content">
         <TopBar title="PokeLab" />

@@ -25,12 +25,16 @@ const PokeCompare = () => {
   const [rightPokemon, setRightPokemon] = useState<Pokemon | null>(null);
   const [searchLeft, setSearchLeft] = useState('');
   const [searchRight, setSearchRight] = useState('');
-  const [allPokemon, setAllPokemon] = useState<Pokemon[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
+
+  const [leftList, setLeftList] = useState<Pokemon[]>([]);
+  const [rightList, setRightList] = useState<Pokemon[]>([]);
+  const [leftOffset, setLeftOffset] = useState(0);
+  const [rightOffset, setRightOffset] = useState(0);
+  const [leftLoading, setLeftLoading] = useState(false);
+  const [rightLoading, setRightLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const limit = 1000;
+
+  const limit = 10;
 
   const handleResize = useCallback(() => {
     setIsMobile(window.innerWidth < 768);
@@ -41,76 +45,83 @@ const PokeCompare = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, [handleResize]);
 
-  const loadMorePokemon = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`https://pokeapi.co/api/v2/pokemon?limit=${limit}&offset=${offset}`);
-      const data = await response.json();
-      
-      if (data.results.length === 0) {
-        setHasMore(false);
-        return;
-      }
+  const fetchPokemon = async (offset: number): Promise<Pokemon[]> => {
+    const response = await fetch(`https://pokeapi.co/api/v2/pokemon?limit=${limit}&offset=${offset}`);
+    const data = await response.json();
+    const detailed = await Promise.all(
+      data.results.map(async (pokemon: any) => {
+        const res = await fetch(pokemon.url);
+        const details = await res.json();
+        return {
+          id: details.id,
+          name: details.name,
+          sprite: details.sprites.front_default || 'https://via.placeholder.com/96',
+          types: details.types.map((t: any) => t.type.name),
+          stats: {
+            hp: details.stats[0].base_stat,
+            attack: details.stats[1].base_stat,
+            defense: details.stats[2].base_stat,
+            'special-attack': details.stats[3].base_stat,
+            'special-defense': details.stats[4].base_stat,
+            speed: details.stats[5].base_stat
+          }
+        };
+      })
+    );
+    return detailed;
+  };
 
-      const detailedPokemon = await Promise.all(
-        data.results.map(async (pokemon: any) => {
-          const detailsResponse = await fetch(pokemon.url);
-          const details = await detailsResponse.json();
-          
-          return {
-            id: details.id,
-            name: details.name,
-            sprite: details.sprites.front_default || 'https://via.placeholder.com/96',
-            types: details.types.map((t: any) => t.type.name),
-            stats: {
-              hp: details.stats[0].base_stat,
-              attack: details.stats[1].base_stat,
-              defense: details.stats[2].base_stat,
-              'special-attack': details.stats[3].base_stat,
-              'special-defense': details.stats[4].base_stat,
-              speed: details.stats[5].base_stat
-            }
-          };
-        })
-      );
+  const loadLeftPokemon = async () => {
+    setLeftLoading(true);
+    const pokemons = await fetchPokemon(leftOffset);
+    setLeftList(prev => [...prev, ...pokemons]);
+    setLeftOffset(prev => prev + limit);
+    setLeftLoading(false);
+  };
 
-      setAllPokemon(prev => [...prev, ...detailedPokemon]);
-      setOffset(prev => prev + limit);
-    } catch (error) {
-      console.error('Error fetching Pokémon:', error);
-    } finally {
-      setLoading(false);
-    }
+  const loadRightPokemon = async () => {
+    setRightLoading(true);
+    const pokemons = await fetchPokemon(rightOffset);
+    setRightList(prev => [...prev, ...pokemons]);
+    setRightOffset(prev => prev + limit);
+    setRightLoading(false);
   };
 
   useEffect(() => {
-    loadMorePokemon();
+    loadLeftPokemon();
+    loadRightPokemon();
   }, []);
 
   useEffect(() => {
-    const handleScroll = () => {
-      if (
-        window.innerHeight + document.documentElement.scrollTop !== 
-        document.documentElement.offsetHeight || 
-        loading || 
-        !hasMore
-      ) {
-        return;
+    const handleScroll = (container: HTMLElement | null, loader: () => void, loading: boolean) => {
+      if (!container || loading) return;
+      if (container.scrollTop + container.clientHeight >= container.scrollHeight - 100) {
+        loader();
       }
-      loadMorePokemon();
     };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [loading, hasMore]);
+    const leftContainer = document.querySelector('.left-list') as HTMLElement;
+    const rightContainer = document.querySelector('.right-list') as HTMLElement;
 
-  const filteredLeft = allPokemon.filter(p => 
-    p.name.toLowerCase().includes(searchLeft.toLowerCase()) || 
+    const onLeftScroll = () => handleScroll(leftContainer, loadLeftPokemon, leftLoading);
+    const onRightScroll = () => handleScroll(rightContainer, loadRightPokemon, rightLoading);
+
+    leftContainer?.addEventListener('scroll', onLeftScroll);
+    rightContainer?.addEventListener('scroll', onRightScroll);
+
+    return () => {
+      leftContainer?.removeEventListener('scroll', onLeftScroll);
+      rightContainer?.removeEventListener('scroll', onRightScroll);
+    };
+  }, [leftOffset, rightOffset, leftLoading, rightLoading]);
+
+  const visibleLeft = leftList.filter(p =>
+    p.name.toLowerCase().includes(searchLeft.toLowerCase()) ||
     p.id.toString().includes(searchLeft)
   );
 
-  const filteredRight = allPokemon.filter(p => 
-    p.name.toLowerCase().includes(searchRight.toLowerCase()) || 
+  const visibleRight = rightList.filter(p =>
+    p.name.toLowerCase().includes(searchRight.toLowerCase()) ||
     p.id.toString().includes(searchRight)
   );
 
@@ -123,10 +134,8 @@ const PokeCompare = () => {
   return (
     <>
       <Sidebar />
-
       <IonPage id="main-content">
         <TopBar title="PokeLab" />
-
         <IonContent className="ion-padding">
           <div className="compare-page">
             <div className="comparison-wrapper">
@@ -140,18 +149,18 @@ const PokeCompare = () => {
                     onChange={(e) => setSearchLeft(e.target.value)}
                     className="search-input"
                   />
-                  <div className="pokemon-list">
-                    {filteredLeft.map(pokemon => (
-                      <div 
-                        key={pokemon.id} 
+                  <div className="pokemon-list left-list">
+                    {visibleLeft.map(pokemon => (
+                      <div
+                        key={pokemon.id}
                         className={`pokemon-card ${leftPokemon?.id === pokemon.id ? 'selected' : ''}`}
                         onClick={() => setLeftPokemon(pokemon)}
                       >
                         <div className="pokemon-number">#{pokemon.id.toString().padStart(4, '0')}</div>
-                        <img 
-                          src={pokemon.sprite} 
-                          alt={pokemon.name} 
-                          className="pokemon-sprite" 
+                        <img
+                          src={pokemon.sprite}
+                          alt={pokemon.name}
+                          className="pokemon-sprite"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = 'https://via.placeholder.com/96';
                           }}
@@ -164,7 +173,7 @@ const PokeCompare = () => {
                         </div>
                       </div>
                     ))}
-                    {loading && <div className="loading-more">Cargando más Pokémon...</div>}
+                    {leftLoading && <div className="loading-more">Cargando más Pokémon...</div>}
                   </div>
                 </div>
 
@@ -197,18 +206,18 @@ const PokeCompare = () => {
                     onChange={(e) => setSearchRight(e.target.value)}
                     className="search-input"
                   />
-                  <div className="pokemon-list">
-                    {filteredRight.map(pokemon => (
-                      <div 
-                        key={pokemon.id} 
+                  <div className="pokemon-list right-list">
+                    {visibleRight.map(pokemon => (
+                      <div
+                        key={pokemon.id}
                         className={`pokemon-card ${rightPokemon?.id === pokemon.id ? 'selected' : ''}`}
                         onClick={() => setRightPokemon(pokemon)}
                       >
                         <div className="pokemon-number">#{pokemon.id.toString().padStart(4, '0')}</div>
-                        <img 
-                          src={pokemon.sprite} 
-                          alt={pokemon.name} 
-                          className="pokemon-sprite" 
+                        <img
+                          src={pokemon.sprite}
+                          alt={pokemon.name}
+                          className="pokemon-sprite"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = 'https://via.placeholder.com/96';
                           }}
@@ -221,7 +230,7 @@ const PokeCompare = () => {
                         </div>
                       </div>
                     ))}
-                    {loading && <div className="loading-more">Cargando más Pokémon...</div>}
+                    {rightLoading && <div className="loading-more">Cargando más Pokémon...</div>}
                   </div>
                 </div>
               </div>

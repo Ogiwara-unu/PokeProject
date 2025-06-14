@@ -159,6 +159,9 @@
 }
 
 @media (max-width: 768px) {
+  .video-content{
+    height: 100%;
+  }
   .fleece-grid {
     flex-direction: column;
   }
