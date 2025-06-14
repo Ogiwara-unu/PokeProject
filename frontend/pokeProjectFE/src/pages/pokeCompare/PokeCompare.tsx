@@ -122,7 +122,7 @@ const PokeCompare = () => {
 
   return (
     <>
-      {!isMobile && <Sidebar />}
+      <Sidebar />
 
       <IonPage id="main-content">
         <TopBar title="PokeLab" />
